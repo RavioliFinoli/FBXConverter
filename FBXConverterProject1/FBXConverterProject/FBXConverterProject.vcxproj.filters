@@ -21,6 +21,9 @@
     <ClInclude Include="FormatHeader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ExportHelpers.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Manager.cpp">
