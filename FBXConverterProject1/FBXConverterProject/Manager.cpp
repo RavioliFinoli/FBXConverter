@@ -478,6 +478,11 @@ bool Converter::createAnimatedMeshFile(FbxNode * scene_node, int nrOfVertices, s
 }
 
 
+std::vector<FbxMatrix> Converter::getInverseBindPoseTransforms(FbxNode* skeletonRoot)
+{
+
+}
+
 bool Converter::createMeshFiles(int nrOfVertices, std::vector<FbxVector4>Positions, std::vector<FbxVector4>normals, std::vector<FbxVector2>UV, const char* node_name)
 {
 
