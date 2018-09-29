@@ -215,3 +215,17 @@ FakesAssemblies/
 **/*.Server/GeneratedArtifacts
 **/*.Server/ModelManifest.xml
 _Pvt_Extensions
+
+*.bin
+
+*.txt
+
+*.ma
+
+*.fbx
+
+*.mb
+
+*.png
+
+*.jpg
