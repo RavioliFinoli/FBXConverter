@@ -46,7 +46,6 @@ Converter::~Converter()
 	sdk_Manager->Destroy();
 }
 
-
 void Converter::convertFileToCustomFormat()
 {
 	//getGroups(scene_rootNode);
@@ -61,14 +60,24 @@ void Converter::convertFileToCustomFormat()
 
 	std::vector<std::vector<Transform>> animation_key_vectors;
 
-	getSceneAnimationData(scene_rootNode, animation_key_vectors) ? printf("GetSceneANimationData run\n") : printf("GetSceneANimationData failed in main\n ");
+	getSceneAnimationData(scene_rootNode, animation_key_vectors) ? printf("Retrieving animation data...\n") : printf("GetSceneAnimationData failed in main\n ");
 	if (animation_key_vectors.size() > 0)
 		createAnimationFile(animation_key_vectors);
 }
 
+void Converter::convertFileToCustomFormatStefan()
+{
+	getSceneMeshes(scene_rootNode, true);
 
 
-void Converter::getSceneMeshes(FbxNode* scene_node)
+	std::vector<std::vector<FBXExport::DecomposedTransform>> animation_key_vectors;
+
+	getSceneAnimationDataStefan(scene_rootNode, animation_key_vectors) ? printf("GetSceneANimationData run\n") : printf("GetSceneANimationData failed in main\n ");
+	if (animation_key_vectors.size() > 0)
+		createAnimationFileStefan(animation_key_vectors);
+}
+
+void Converter::getSceneMeshes(FbxNode* scene_node, bool useStefan /*= false*/)
 {
 
 	if (!scene_node)
@@ -132,8 +141,14 @@ void Converter::getSceneMeshes(FbxNode* scene_node)
 			FbxBlendShape* mesh_blend_shape = (FbxBlendShape*)(scene_mesh->GetDeformer(0, FbxDeformer::eBlendShape));
 
 			if (mesh_skin)
-				createAnimatedMeshFile(scene_node, scene_mesh->GetPolygonCount() * 3, Positions, normals, UV, node_name, polygon_vertices_indices) ? printf("Animated Mesh file created!\n") : printf("Animated Mesh file could not be created");
-
+			{
+				if (useStefan)
+					createAnimatedMeshFileStefan(scene_node, scene_mesh->GetPolygonCount() * 3, Positions, normals, UV, node_name, polygon_vertices_indices) ? printf("Animated Mesh file created!\n") : printf("Animated Mesh file could not be created");
+				else
+					createAnimatedMeshFile(scene_node, scene_mesh->GetPolygonCount() * 3, Positions, normals, UV, node_name, polygon_vertices_indices) ? printf("Animated Mesh file created!\n") : printf("Animated Mesh file could not be created");
+			}
+				
+			
 			if (mesh_blend_shape) {
 				FbxScene * scene = sdk_scene;
 
@@ -150,12 +165,10 @@ void Converter::getSceneMeshes(FbxNode* scene_node)
 
 	for (int i = 0; i < scene_node->GetChildCount(); i++)
 	{
-		getSceneMeshes(scene_node->GetChild(i));
+		getSceneMeshes(scene_node->GetChild(i), useStefan);
 	}
 	return;
 }
-
-
 
 bool Converter::createAnimatedMeshFile(FbxNode * scene_node, int nrOfVertices, std::vector<FbxVector4> Positions, std::vector<FbxVector4> normals, std::vector<FbxVector2> UV, const char * node_name, std::vector<int> weight_indices_vector)
 {
@@ -246,12 +259,9 @@ bool Converter::createAnimatedMeshFile(FbxNode * scene_node, int nrOfVertices, s
 					}
 				}
 
+				/// #InverseBindPose
 				std::string connectedJointName = skin_cluster->GetLink()->GetName();
 				std::string parent_name = skin_cluster->GetLink()->GetParent()->GetName();
-
-
-				/// #InverseBindPose
-
 
 				FbxAMatrix transformation;
 				FbxAMatrix linked_Transformation;
@@ -484,6 +494,302 @@ bool Converter::createAnimatedMeshFile(FbxNode * scene_node, int nrOfVertices, s
 	return true;
 }
 
+bool Converter::createAnimatedMeshFileStefan(FbxNode * scene_node, int nrOfVertices, std::vector<FbxVector4> Positions, std::vector<FbxVector4> normals, std::vector<FbxVector2> UV, const char * node_name, std::vector<int> weight_indices_vector)
+{
+	std::vector<AnimatedVertex> skin_bound_vertices = std::vector<AnimatedVertex>(nrOfVertices);
+
+
+	for (int i = 0; i < nrOfVertices; i++)
+	{
+		COPY_DOUBLE_FLOAT(3, Positions[i], skin_bound_vertices[i].vertex_position);
+		COPY_DOUBLE_FLOAT(3, normals[i], skin_bound_vertices[i].vertex_normal);
+		COPY_DOUBLE_FLOAT(2, UV[i], skin_bound_vertices[i].vertex_UVCoord);
+
+
+		skin_bound_vertices[i].joint_weights[0] = 0.0f;
+		skin_bound_vertices[i].joint_weights[1] = 0.0f;
+		skin_bound_vertices[i].joint_weights[2] = 0.0f;
+		skin_bound_vertices[i].joint_weights[3] = 0.0f;
+
+		skin_bound_vertices[i].influencing_joint[0] = 0;
+		skin_bound_vertices[i].influencing_joint[1] = 0;
+		skin_bound_vertices[i].influencing_joint[2] = 0;
+		skin_bound_vertices[i].influencing_joint[3] = 0;
+
+
+	}
+
+	FbxMesh* scene_mesh = scene_node->GetMesh();
+	FBXExport::Skeleton eSkeleton;
+
+	if (scene_mesh)
+	{
+		std::vector<FbxAMatrix> skeleton_joints_temp_vector;
+		std::vector<std::string> skeleton_joint_names;
+		std::vector<FbxNode*> skeleton_joint_parent_names;
+
+		FbxAMatrix transformation_matrix;
+		transformation_matrix.SetT(scene_node->LclTranslation.Get());
+		transformation_matrix.SetR(scene_node->LclRotation.Get());
+		transformation_matrix.SetS(scene_node->LclScaling.Get());
+
+		FbxCluster * skin_cluster = nullptr;
+
+		int skin_count = scene_node->GetMesh()->GetDeformerCount(FbxDeformer::eSkin);
+
+		std::vector<int> indicesVector;
+		std::vector<double> weightVector;
+		std::vector<FbxVector4> controlPointsVector;
+
+		for (int i = 0; i < skin_count; i++)
+		{
+			FbxSkin* mesh_skin = (FbxSkin*)(scene_mesh->GetDeformer(i, FbxDeformer::eSkin));
+			if (!mesh_skin)
+				continue;
+
+			for (int j = 0; j < mesh_skin->GetClusterCount(); j++)
+			{
+				if (j == 0) ///root node, build hierarchy
+				{
+					FbxSkeleton* skeleton = static_cast<FbxSkeleton*>(mesh_skin->GetCluster(j)->GetLink()->GetNodeAttribute());
+					if (skeleton)
+					{
+						ProcessSkeletonHierarchy(skeleton->GetNode(), eSkeleton);
+						int i = 0;
+					}
+				}
+
+				{
+					SetConsoleTextAttribute(hConsole, COLOR_ATTRIBUTE_GREY);
+					std::cout << "Processing joint ";
+					SetConsoleTextAttribute(hConsole, COLOR_ATTRIBUTE_WHITE);
+					std::cout << j << std::endl;
+				}
+
+				skin_cluster = mesh_skin->GetCluster(j);
+
+				auto thisJointName = skin_cluster->GetLink()->GetNodeAttribute()->GetNode()->GetNameOnly();
+				FBXExport::Bone* thisBone = nullptr;
+				int skeletonIndex = 0;
+				for (int i = 0; i < eSkeleton.joints.size(); i++)
+				{
+					if (eSkeleton.joints[i].name == thisJointName)
+					{
+						thisBone = &eSkeleton.joints[i];
+						skeletonIndex = i;
+					}
+				}
+
+				/// ------------ #InverseBindPose
+				std::string connectedJointName = skin_cluster->GetLink()->GetName();
+				std::string parent_name = skin_cluster->GetLink()->GetParent()->GetName();
+
+				FbxAMatrix transformation;
+				FbxAMatrix linked_Transformation;
+				FbxAMatrix inverse_bind_pose;
+				/// #todo remove
+				skin_cluster->GetTransformMatrix(transformation);
+				skin_cluster->GetTransformLinkMatrix(linked_Transformation);
+				inverse_bind_pose = linked_Transformation.Inverse() * transformation;
+
+				thisBone->jointInverseBindPoseTransform = linked_Transformation.Inverse();
+				thisBone->jointReferenceTransform = transformation;
+				/// -------------
+
+				SetConsoleTextAttribute(hConsole, COLOR_ATTRIBUTE_GREY);
+				std::cout << "\t" << connectedJointName << std::endl << std::endl;
+
+				/// ------------- Weights/Indices 
+				double * weights = skin_cluster->GetControlPointWeights();
+				int *indices = skin_cluster->GetControlPointIndices();
+
+				for (int k = 0; k < skin_bound_vertices.size(); k++)
+				{
+					for (int x = 0; x < skin_cluster->GetControlPointIndicesCount(); x++)
+					{
+						if (indices[x] == weight_indices_vector[k])
+						{
+							for (int m = 0; m < 4; m++)
+							{
+								if (skin_bound_vertices[k].influencing_joint[m] == 0)
+								{
+									skin_bound_vertices[k].influencing_joint[m] = j + 1;
+									skin_bound_vertices[k].joint_weights[m] = weights[x];
+									m = 4;
+								}
+
+							}
+						}
+
+
+					}
+
+				}
+				/// -----------------
+			}
+
+
+		}
+
+		createSkeletonFileStefan(eSkeleton);
+		int nrOfVerts = nrOfVertices;
+		const char * temp = "_Mesh";
+		// #todo proper file name
+		std::string filename = std::string(EXPORT_LOCATION) + /*std::string(node_name) + */"test_ANIMATION_Mesh.bin";
+		std::ofstream outfile(filename, std::ofstream::binary);
+		std::string readable_file_name = std::string(EXPORT_LOCATION) + /*std::string(node_name) +*/ "test_ANIMATION_Mesh.txt";
+		std::ofstream readable_file(readable_file_name);
+
+		std::cout << "Found mesh:  " << node_name << " Nr of verts: " << nrOfVerts << "\n";
+
+		if (!outfile)
+		{
+			printf("No file could be opened. Manager.cpp line 122");
+			return false;
+		}
+		if (!readable_file)
+		{
+			printf("No file could be opened. Manager.cpp line 122");
+			return false;
+		}
+
+
+		readable_file << "NrOfverts: " << nrOfVerts << "\n";
+		readable_file.write((const char*)node_name, sizeof(char[100]));
+		readable_file << "\n";
+		for (int i = 0; i < nrOfVerts; i++)
+		{
+		}
+		outfile.write((const char*)&nrOfVerts, sizeof(int));
+		outfile.write((const char*)node_name, sizeof(const char[100]));
+
+		float tan[3];
+		float dVec1[3];
+		float dVec2[3];
+		float vec1[3];
+		float vec2[3];
+		float uVec1[2];
+		float uVec2[2];
+		std::vector<float> tanVec;
+
+		for (int i = 0; i < nrOfVerts; i += 3)
+		{
+
+			vec1[0] = Positions[i + 1][0] - Positions[i][0];
+			vec1[1] = Positions[i + 1][1] - Positions[i][1];
+			vec1[2] = Positions[i + 1][2] - Positions[i][2];
+
+			vec2[0] = Positions[i + 2][0] - Positions[i][0];
+			vec2[1] = Positions[i + 2][1] - Positions[i][1];
+			vec2[2] = Positions[i + 2][2] - Positions[i][2];
+
+
+
+			uVec1[0] = UV[i + 1][0] - UV[i][0];
+			uVec1[1] = UV[i + 1][1] - UV[i][1];
+
+			uVec2[0] = UV[i + 2][0] - UV[i][0];
+			uVec2[1] = UV[i + 2][1] - UV[i][1];
+
+			float denominator = (uVec1[0] * uVec2[1]) - (uVec1[1] * uVec2[0]);
+			float someFloat = 1.0f / denominator;
+
+
+
+			dVec1[0] = vec1[0] * uVec2[1];
+			dVec1[1] = vec1[1] * uVec2[1];
+			dVec1[2] = vec1[2] * uVec2[1];
+
+			dVec2[0] = vec2[0] * uVec1[1];
+			dVec2[1] = vec2[1] * uVec1[1];
+			dVec2[2] = vec2[2] * uVec1[1];
+
+
+			tan[0] = dVec1[0] - dVec2[0];
+			tan[1] = dVec1[1] - dVec2[1];
+			tan[2] = dVec1[2] - dVec2[2];
+
+			tan[0] = tan[0] * someFloat;
+			tan[1] = tan[1] * someFloat;
+			tan[2] = tan[2] * someFloat;
+
+			for (int j = 0; j < 3; j++)
+			{
+				for (int x = 0; x < 3; x++)
+				{
+					tanVec.push_back(tan[x]);
+				}
+			}
+		}
+
+
+		for (int i = 0; i < nrOfVerts; i++)
+		{
+			//TODO READ/WRITE FLOAT INSTEAD DOUBLES->PAIR WITH ENGINE
+			float temp[4];
+			unsigned int tempWeights[4];
+			for (int j = 0; j < 4; j++)
+			{
+				tempWeights[j] = skin_bound_vertices[i].influencing_joint[j];
+			}
+			COPY_DOUBLE_FLOAT(3, skin_bound_vertices[i].vertex_position, temp);
+
+			outfile.write((const char*)&skin_bound_vertices[i].vertex_position[0], sizeof(float));
+			outfile.write((const char*)&skin_bound_vertices[i].vertex_position[1], sizeof(float));
+			outfile.write((const char*)&skin_bound_vertices[i].vertex_position[2], sizeof(float));
+			readable_file << i << ":  Position:  X " << temp[0] << " Y " << temp[1] << " Z " << temp[2] << "\n";
+
+			COPY_DOUBLE_FLOAT(2, UV[i], temp);
+
+			outfile.write((const char*)&skin_bound_vertices[i].vertex_UVCoord[0], sizeof(float));
+			outfile.write((const char*)&skin_bound_vertices[i].vertex_UVCoord[1], sizeof(float));
+
+			readable_file << i << ":  UV:  U " << temp[0] << "V " << temp[1] << "\n";
+
+
+			COPY_DOUBLE_FLOAT(3, normals[i], temp);
+			outfile.write((const char*)&skin_bound_vertices[i].vertex_normal[0], sizeof(float));
+			outfile.write((const char*)&skin_bound_vertices[i].vertex_normal[1], sizeof(float));
+			outfile.write((const char*)&skin_bound_vertices[i].vertex_normal[2], sizeof(float));
+
+			readable_file << i << ":  Normals:  X " << skin_bound_vertices[i].vertex_normal[0] << " Y " << skin_bound_vertices[i].vertex_normal[1] << " Z " << skin_bound_vertices[i].vertex_normal[2] << "\n";
+			auto first = tanVec.begin();
+			auto last = tanVec.begin() + 3;
+
+			std::vector<float> x(first, last);
+			tanVec.erase(first, last);
+			outfile.write((const char*)&x[0], sizeof(float));
+			outfile.write((const char*)&x[1], sizeof(float));
+			outfile.write((const char*)&x[2], sizeof(float));
+			readable_file << i << ":  tan:  X " << x[0] << " Y " << x[1] << " Z " << x[2] << "\n";
+
+			outfile.write((const char*)&tempWeights[0], sizeof(unsigned int));
+			outfile.write((const char*)&tempWeights[1], sizeof(unsigned int));
+			outfile.write((const char*)&tempWeights[2], sizeof(unsigned int));
+			outfile.write((const char*)&tempWeights[3], sizeof(unsigned int));
+
+			COPY_DOUBLE_FLOAT(4, skin_bound_vertices[i].joint_weights, temp);
+			outfile.write((const char*)&temp[0], sizeof(float));
+			outfile.write((const char*)&temp[1], sizeof(float));
+			outfile.write((const char*)&temp[2], sizeof(float));
+			outfile.write((const char*)&temp[3], sizeof(float));
+
+			readable_file << i << ":  Weights:  1: " << temp[0] << " 2: " << temp[1] << " 3: " << temp[2] << " 4: " << temp[3] << "\n";
+
+			readable_file << i << ":  Influencing indices:  1: " << tempWeights[0] << " 2: " << tempWeights[1] << " 3: " << tempWeights[2] << " 4: " << tempWeights[3] << "\n";
+
+		}
+
+
+
+		readable_file.close();
+		outfile.close();
+	}
+
+	return true;
+
+	return false;
+}
 
 std::vector<FbxMatrix> Converter::getInverseBindPoseTransforms(FbxNode* skeletonRoot)
 {
@@ -787,6 +1093,134 @@ bool Converter::getSceneAnimationData(FbxNode * scene_node, std::vector<std::vec
 	return true;
 }
 
+bool Converter::getSceneAnimationDataStefan(FbxNode * scene_node, std::vector<std::vector<FBXExport::DecomposedTransform>> &transform_vector)
+{
+	FbxScene * scene = sdk_scene;
+	FbxAnimStack* anim_stack = scene->GetCurrentAnimationStack();
+	FbxAnimLayer* anim_layer = anim_stack->GetMember<FbxAnimLayer>();
+
+
+	FbxAnimCurve* anim_curve_rotY = scene_node->LclRotation.GetCurve(anim_layer, FBXSDK_CURVENODE_COMPONENT_Y); //ghetto
+
+	if (anim_curve_rotY)
+	{
+		FbxSkeleton* skeleton = static_cast<FbxSkeleton*>(scene_node->GetNodeAttribute());
+		if (skeleton)
+		{
+			float frameTime = 1.0 / 24.0;
+			int keyCount = anim_curve_rotY->KeyGetCount();
+
+			float endTime = frameTime * keyCount;
+			float currentTime = frameTime;
+
+			std::vector<FbxVector4> rotVector;
+			std::vector<FBXExport::DecomposedTransform> thisTransformVector;
+			while (currentTime < endTime)
+			{
+				FbxTime takeTime;
+				takeTime.SetSecondDouble(currentTime);
+
+				// #calculateLocalTransform
+				FbxAMatrix matAbsoluteTransform2 = GetAbsoluteTransformFromCurrentTake(skeleton->GetNode(), takeTime);
+				FbxAMatrix matParentAbsoluteTransform2 = GetAbsoluteTransformFromCurrentTake(skeleton->GetNode()->GetParent(), takeTime);
+				FbxAMatrix matInvParentAbsoluteTransform2 = matParentAbsoluteTransform2.Inverse();
+				FbxAMatrix matTransform2 = matInvParentAbsoluteTransform2 * matAbsoluteTransform2;
+
+				// Get T, R, S
+				auto translation = matTransform2.GetT();
+				auto rotation = matTransform2.GetQ();
+				auto scale = matTransform2.GetS();
+
+				FBXExport::DecomposedTransform thisTransform = {};
+				thisTransform.translation = FBXExport::Vec4(translation);
+				thisTransform.rotation    = FBXExport::Vec4(rotation);
+				thisTransform.scale       = FBXExport::Vec4(scale);
+
+				thisTransformVector.push_back(thisTransform);
+
+				//increment time
+				currentTime += frameTime;
+			}
+			transform_vector.push_back(thisTransformVector);
+		}
+		/*
+		//std::vector<Transform> transform_temp;
+
+
+		//std::vector<FbxVector4> temp_translations;
+		//std::vector<FbxVector4> temp_rotations;
+		//std::vector<FbxVector4> temp_scaling;
+		//FbxAnimCurve* anim_curve_rotZ = scene_node->LclRotation.GetCurve(anim_layer, FBXSDK_CURVENODE_COMPONENT_Z);
+		//FbxAnimCurve* anim_curve_rotX = scene_node->LclRotation.GetCurve(anim_layer, FBXSDK_CURVENODE_COMPONENT_X);
+		//
+		//auto postRot = scene_node->GetPostRotation(FbxNode::eSourcePivot);
+		//auto preRot = scene_node->GetPreRotation(FbxNode::eSourcePivot);
+
+		//FbxAnimCurve* anim_curve_translateY = scene_node->LclTranslation.GetCurve(anim_layer, FBXSDK_CURVENODE_COMPONENT_Y);
+		//FbxAnimCurve* anim_curve_translateX = scene_node->LclTranslation.GetCurve(anim_layer, FBXSDK_CURVENODE_COMPONENT_X);
+		//FbxAnimCurve* anim_curve_translateZ = scene_node->LclTranslation.GetCurve(anim_layer, FBXSDK_CURVENODE_COMPONENT_Z);
+
+		//FbxAnimCurve* anim_curve_scaleY = scene_node->LclScaling.GetCurve(anim_layer, FBXSDK_CURVENODE_COMPONENT_Y);
+		//FbxAnimCurve* anim_curve_scaleX = scene_node->LclScaling.GetCurve(anim_layer, FBXSDK_CURVENODE_COMPONENT_X);
+		//FbxAnimCurve* anim_curve_scaleZ = scene_node->LclScaling.GetCurve(anim_layer, FBXSDK_CURVENODE_COMPONENT_Z);
+
+
+		//std::vector<FbxAMatrix> matrices;
+		//FbxAMatrix matrix;
+
+
+		//for (int i = 0; i < anim_curve_rotY->KeyGetCount(); i++)
+		//{
+		//	FbxVector4 translation((double)anim_curve_translateX->KeyGetValue(i), (double)anim_curve_translateY->KeyGetValue(i), (double)anim_curve_translateZ->KeyGetValue(i), 1);
+		//	FbxVector4 rotation((double)anim_curve_rotX->KeyGetValue(i), (double)anim_curve_rotY->KeyGetValue(i), (double)anim_curve_rotZ->KeyGetValue(i), 0);
+		//	FbxVector4 scale((double)anim_curve_scaleX->KeyGetValue(i), (double)anim_curve_scaleY->KeyGetValue(i), (double)anim_curve_scaleZ->KeyGetValue(i), 0);
+
+		//	Transform transform_to_push_back;
+
+		//	transform_to_push_back.transform_position[0] = (float)anim_curve_translateX->KeyGetValue(i);
+		//	transform_to_push_back.transform_position[1] = (float)anim_curve_translateY->KeyGetValue(i);
+		//	transform_to_push_back.transform_position[2] = (float)anim_curve_translateZ->KeyGetValue(i);
+
+		//	FbxAMatrix animRotMatrix;
+		//	FbxAMatrix preRotMatrix;
+		//	FbxAMatrix postRotMatrix;
+		//	FbxVector4 animRotation((float)anim_curve_rotX->KeyGetValue(i), (float)anim_curve_rotY->KeyGetValue(i), (float)anim_curve_rotZ->KeyGetValue(i));
+		//	animRotMatrix.SetR(animRotation);
+		//	preRotMatrix.SetR(preRot);
+		//	postRotMatrix.SetR(postRot);
+
+		//	animRotMatrix = preRotMatrix * animRotMatrix * postRotMatrix;
+
+		//	auto rot = animRotMatrix.GetR();
+		//	transform_to_push_back.transform_rotation[0] = rot.mData[0];
+		//	transform_to_push_back.transform_rotation[1] = rot.mData[1];
+		//	transform_to_push_back.transform_rotation[2] = rot.mData[2];
+		//	transform_to_push_back.transform_rotation[0] = (float)anim_curve_rotX->KeyGetValue(i);// +preRot.mData[0] + postRot.mData[0];
+		//	transform_to_push_back.transform_rotation[1] = (float)anim_curve_rotY->KeyGetValue(i);// +preRot.mData[1] + postRot.mData[1];
+		//	transform_to_push_back.transform_rotation[2] = (float)anim_curve_rotZ->KeyGetValue(i);// +preRot.mData[2] + postRot.mData[2];
+		//	transform_to_push_back.transform_scale[0] = (float)anim_curve_scaleX->KeyGetValue(i);
+		//	transform_to_push_back.transform_scale[1] = (float)anim_curve_scaleY->KeyGetValue(i);
+		//	transform_to_push_back.transform_scale[2] = (float)anim_curve_scaleZ->KeyGetValue(i);
+
+		//	transform_temp.push_back(transform_to_push_back);
+		//	matrix.SetTRS(translation, rotation, scale);
+
+		//}
+		//transform_vector.push_back(transform_temp);
+		*/
+	}
+
+	//Keep going for each child (joint)
+
+	for (int i = 0; i < scene_node->GetChildCount(); i++)
+	{
+		getSceneAnimationDataStefan(scene_node->GetChild(i), transform_vector);
+	}
+
+	return true;
+}
+
+
 bool Converter::createSkeletonFile(std::vector<std::string> names, std::vector<FbxAMatrix> joint_matrices, int nrOfJoints, std::vector<FbxNode*> parent_name_list)
 {
 	const char * temp = "_Skeleton";
@@ -853,7 +1287,6 @@ bool Converter::createSkeletonFile(std::vector<std::string> names, std::vector<F
 	}
 	printf("Joint names depth first:\n");
 	std::cout << names[0] << std::endl;
-	std::cout << nrOfJoints << std::endl;
 
 	readable_file << nrOfJoints << "\n";
 
@@ -918,10 +1351,25 @@ bool Converter::createSkeletonFile(std::vector<std::string> names, std::vector<F
 		outfile.write((const char*)&temp_transform, sizeof(Transform));
 		int temp = parent_index_vector[i];
 		outfile.write((const char*)&temp, sizeof(int));
-		std::cout << "namn";
 		std::cout << nameForBinary << std::endl;
 	}
 
+
+	outfile.close();
+	readable_file.close();
+
+	return true;
+}
+
+bool Converter::createSkeletonFileStefan(const FBXExport::Skeleton& skeleton)
+{
+	std::string rootJointName = std::string(skeleton.joints[0].name.Buffer());
+	std::string filename = std::string(EXPORT_LOCATION) + rootJointName + std::string("_Skeleton.bin");
+	std::ofstream outfile(filename, std::ofstream::binary);
+	std::string readable_file_name = std::string(EXPORT_LOCATION) + rootJointName + std::string("_Skeleton.txt");
+	std::ofstream readable_file(readable_file_name);
+
+	FBXExport::appendSkeleton(outfile, skeleton);
 
 	outfile.close();
 	readable_file.close();
@@ -982,6 +1430,39 @@ void Converter::createAnimationFile(std::vector<std::vector<Transform>> keys)
 			readable_file << "Translation: " << "X:\t" << (float)keys[j][i].transform_position[0] << " Y:\t" << (float)keys[j][i].transform_position[1] << " Z:\t" << (float)keys[j][i].transform_position[2] << "\n";
 			readable_file << "Rotation: " << "X:\t" << keys[j][i].transform_rotation[0] << " Y:\t" << keys[j][i].transform_rotation[1] << " Z:\t" << keys[j][i].transform_rotation[2] << "\n";
 			readable_file << "Scale: " << "X:\t" << (float)keys[j][i].transform_scale[0] << " Y:\t" << (float)keys[j][i].transform_scale[1] << " Z:\t" << (float)keys[j][i].transform_scale[2] << "\n";
+		}
+
+	}
+
+
+	outfile.close();
+	readable_file.close();
+
+}
+
+void Converter::createAnimationFileStefan(std::vector<std::vector<FBXExport::DecomposedTransform>> keys)
+{
+	std::string filename = std::string(EXPORT_LOCATION) + std::string("ANIMATION") + "_ANIMATION.bin";
+	std::ofstream outfile(filename, std::ofstream::binary);
+	std::string readable_file_name = std::string(EXPORT_LOCATION) + std::string("ANIMATION") + "_ANIMATION.txt";
+	std::ofstream readable_file(readable_file_name);
+
+	int32_t nrOfKeys = keys[0].size();
+	outfile.write((const char*)&nrOfKeys, sizeof(int32_t));
+	readable_file << nrOfKeys << "\n";
+
+	for (int i = 0; i < keys[0].size(); i++)
+	{
+		for (int j = 0; j < keys.size(); j++)
+		{
+
+			FBXExport::appendTransform(outfile, keys[j][i]);
+
+			//{
+			//	readable_file << "Translation: " << "X:\t" << (float)keys[j][i].translation.x << " Y:\t" << (float)keys[j][i].translation.y << " Z:\t" << (float)keys[j][i].translation.z << "\n";
+			//	readable_file << "Rotation: " << "X:\t" << (float)keys[j][i].rotation.x << " Y:\t" << (float)keys[j][i].rotation.y << " Z:\t" << (float)keys[j][i].rotation.z << "\n";
+			//	readable_file << "Scale: " << "X:\t" << (float)keys[j][i].scale.x << " Y:\t" << (float)keys[j][i].scale.y << " Z:\t" << (float)keys[j][i].scale.z << "\n";
+			//}
 		}
 
 	}
