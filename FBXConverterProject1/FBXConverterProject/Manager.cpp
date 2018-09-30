@@ -1,6 +1,8 @@
 #include "Manager.h"
+//#include "ExportHelpers.h"
 #include <windows.h>
 #include <DirectXMath.h>
+#include "ExportHelpers.h"
 #define ZERO_IF_SMALL(x) if(std::fabs(x<0.0001))x=0.0f
 #define EXPORT_LOCATION "C:/Repos/RipTag/Assets/"
 #define COLOR_ATTRIBUTE_GREEN 2
@@ -14,6 +16,8 @@ int counter = -1; while(counter++ < COUNT-1) PTR2[counter] = (float)PTR1[counter
 };
 
 HANDLE hConsole;
+
+void ProcessSkeletonHierarchy(FbxNode* inRootNode, FBXExport::Skeleton& skeleton);
 
 Converter::Converter(const char* fileName)
 {
@@ -157,6 +161,7 @@ bool Converter::createAnimatedMeshFile(FbxNode * scene_node, int nrOfVertices, s
 {
 	std::vector<AnimatedVertex> skin_bound_vertices = std::vector<AnimatedVertex>(nrOfVertices);
 
+
 	for (int i = 0; i < nrOfVertices; i++)
 	{
 		COPY_DOUBLE_FLOAT(3, Positions[i], skin_bound_vertices[i].vertex_position);
@@ -177,6 +182,8 @@ bool Converter::createAnimatedMeshFile(FbxNode * scene_node, int nrOfVertices, s
 
 	}
 	FbxMesh* scene_mesh = scene_node->GetMesh();
+	//
+	FBXExport::Skeleton eSkeleton; 
 
 	if (scene_mesh)
 	{
@@ -208,6 +215,15 @@ bool Converter::createAnimatedMeshFile(FbxNode * scene_node, int nrOfVertices, s
 			temp.SetIdentity();
 			for (int j = 0; j < mesh_skin->GetClusterCount(); j++)
 			{
+				if (j == 0) ///root node, build hierarchy
+				{
+					FbxSkeleton* skeleton = static_cast<FbxSkeleton*>(mesh_skin->GetCluster(j)->GetLink()->GetNodeAttribute());
+					if (skeleton)
+					{
+						ProcessSkeletonHierarchy(skeleton->GetNode(), eSkeleton);
+						int i = 0;
+					}
+				}
 
 				{
 					SetConsoleTextAttribute(hConsole, COLOR_ATTRIBUTE_GREY);
@@ -217,36 +233,38 @@ bool Converter::createAnimatedMeshFile(FbxNode * scene_node, int nrOfVertices, s
 				}
 				
 				skin_cluster = mesh_skin->GetCluster(j);
+
+				auto thisJointName = skin_cluster->GetLink()->GetNodeAttribute()->GetNode()->GetNameOnly();
+				FBXExport::Bone* thisBone = nullptr;
+				int skeletonIndex = 0;
+				for (int i = 0; i < eSkeleton.joints.size(); i++)
+				{
+					if (eSkeleton.joints[i].name == thisJointName)
+					{
+						thisBone = &eSkeleton.joints[i];
+						skeletonIndex = i;
+					}
+				}
+
 				std::string connectedJointName = skin_cluster->GetLink()->GetName();
 				std::string parent_name = skin_cluster->GetLink()->GetParent()->GetName();
 
+
+				/// #InverseBindPose
+
+
 				FbxAMatrix transformation;
 				FbxAMatrix linked_Transformation;
-
-
-				//skin_cluster->GetTransformMatrix(transformation);
-				//skin_cluster->GetTransformLinkMatrix(linked_Transformation);
-				//linked_Transformation.SetR(skin_cluster->GetLink()->EvaluateLocalRotation());
-				//FbxAMatrix inverse_bind_pose = linked_Transformation.Inverse() * transformation * transformation_matrix;
-
-				//auto rot = inverse_bind_pose.GetR();
-				//rot.mData[0] *= -1.0f;
-				//rot.mData[1] *= -1.0f;
-				//inverse_bind_pose.SetR(rot);
+				FbxAMatrix inverse_bind_pose;
+				// #todo remove
 				skin_cluster->GetTransformMatrix(transformation);
 				skin_cluster->GetTransformLinkMatrix(linked_Transformation);
-				//linked_Transformation.SetR(skin_cluster->GetLink()->GetPreRotation(FbxNode::eSourcePivot));
-				//linked_Transformation.SetR(skin_cluster->GetLink()->GetPreRotation(FbxNode::eSourcePivot));
+				inverse_bind_pose = linked_Transformation.Inverse() * transformation;
 
-				FbxAMatrix inverse_bind_pose = linked_Transformation.Inverse() * transformation;
+				thisBone->jointInverseBindPoseTransform = linked_Transformation.Inverse();
+				thisBone->jointReferenceTransform = transformation;
 
-				auto test = inverse_bind_pose.GetR();
-				auto test2 = inverse_bind_pose.GetQ();
-
-				auto rebuilt = DirectX::XMQuaternionRotationRollPitchYaw(test.mData[0], test.mData[1], test.mData[2]);
-				auto rebuiltNegated = rebuilt;
-				
-
+				/*
 				inverse_bind_pose.SetR(skin_cluster->GetLink()->EvaluateLocalRotation());
 				if (j == 0)
 				{
@@ -256,19 +274,8 @@ bool Converter::createAnimatedMeshFile(FbxNode * scene_node, int nrOfVertices, s
 				{
 					inverse_bind_pose = skin_cluster->GetLink()->EvaluateGlobalTransform().Inverse();
 				}
+				*/
 
-					//FbxAMatrix pre;
-					//pre.SetR(skin_cluster->GetLink()->PreRotation.Get());
-					//FbxAMatrix post;
-					//post.SetR(skin_cluster->GetLink()->GetPostTargetRotation());
-					////inverse_bind_pose = pre * linked_Transformation * post;
-					//inverse_bind_pose.set
-
-					////inverse_bind_pose.SetR(skin_cluster->GetLink()->GetPreRotation(FbxNode::eSourcePivot));
-					////inverse_bind_pose *= skin_cluster->GetLink()->EvaluateLocalTransform(FBXSDK_TIME_INFINITE).Inverse();
-					////inverse_bind_pose = skin_cluster->GetLink()->EvaluateLocalTransform(FBXSDK_TIME_INFINITE);
-					//std::cout << skin_cluster->GetLink()->GetName() << std::endl;
-					//JOINT INFORMATION
 				skeleton_joint_names.push_back(connectedJointName);
 				skeleton_joints_temp_vector.push_back(inverse_bind_pose);
 				skeleton_joint_parent_names.push_back(skin_cluster->GetLink());
@@ -703,6 +710,7 @@ bool Converter::getSceneAnimationData(FbxNode * scene_node, std::vector<std::vec
 			transform_vector.push_back(thisTransformVector);
 
 		}
+		/*
 		//std::vector<Transform> transform_temp;
 
 
@@ -766,6 +774,7 @@ bool Converter::getSceneAnimationData(FbxNode * scene_node, std::vector<std::vec
 
 		//}
 		//transform_vector.push_back(transform_temp);
+		*/
 	}
 
 
@@ -811,7 +820,7 @@ bool Converter::createSkeletonFile(std::vector<std::string> names, std::vector<F
 			if()
 		}
 	}*/
-	// #todo
+	
 	std::vector<FbxAMatrix> tempMultiplied;
 	for (int i = 0; i < joint_matrices.size(); i++)
 	{
@@ -981,4 +990,46 @@ void Converter::createAnimationFile(std::vector<std::vector<Transform>> keys)
 	outfile.close();
 	readable_file.close();
 
+}
+
+// inDepth is not needed here, I used it for debug but forgot to remove it
+void ProcessSkeletonHierarchyRecursively(FbxNode* inNode, FBXExport::Skeleton& skeleton)
+{
+	int childCount = inNode->GetChildCount();
+	if (inNode->GetNodeAttribute() && inNode->GetNodeAttribute()->GetAttributeType() && inNode->GetNodeAttribute()->GetAttributeType() == FbxNodeAttribute::eSkeleton)
+	{
+		FBXExport::Bone currJoint;;
+		currJoint.name = inNode->GetNameOnly();
+
+		//find and set parent index
+		for (int i = 0; i < skeleton.joints.size(); i++) 
+		{
+			auto parentName = inNode->GetParent()->GetNameOnly();
+			if (skeleton.joints[i].name == parentName)
+				currJoint.parentIndex = i;
+		}
+		
+		skeleton.joints.push_back(currJoint);
+	}
+	for (int i = 0; i < childCount; i++)
+	{
+		ProcessSkeletonHierarchyRecursively(inNode->GetChild(i), skeleton);
+	}
+}
+
+void ProcessSkeletonHierarchy(FbxNode* inRootNode, FBXExport::Skeleton& skeleton)
+{
+	FBXExport::Bone root;
+	root.parentIndex = -1;
+	root.name = inRootNode->GetNameOnly();
+	skeleton.joints.push_back(root);
+
+	int childCount = inRootNode->GetChildCount();
+
+	for (int childIndex = 0; childIndex < childCount; ++childIndex)
+	{
+		std::cout << "Processing ROOT child " << childIndex << std::endl;
+		FbxNode* currNode = inRootNode->GetChild(childIndex);
+		ProcessSkeletonHierarchyRecursively(currNode, skeleton);
+	}
 }
