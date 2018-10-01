@@ -9,7 +9,7 @@ int main()
 	HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 
 	Converter converter("test.fbx");
-	converter.convertFileToCustomFormatStefan();
+	converter.convertFileToCustomFormat();
 
 	SetConsoleTextAttribute(hConsole, 2);
 	std::cout << "Export finished."<< std::endl;

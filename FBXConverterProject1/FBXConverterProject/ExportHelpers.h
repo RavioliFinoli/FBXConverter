@@ -100,6 +100,32 @@ namespace FBXExport
 		file.write((const char*)&vec, sizeof(Vec4));
 	}
 
+	//Flips the Z axis before writing
+	void appendFloat4AsDirectXVector(std::ofstream& file, const Vec4 vec)
+	{
+		if (!file.is_open())
+			return;
+
+		Vec4 v = vec;
+		v.z *= -1.0f;
+
+		file.write((const char*)&vec, sizeof(Vec4));
+	}
+
+	//Flips X and Y components before writing
+	void appendFloat4AsDirectXQuaternion(std::ofstream& file, const Vec4 vec)
+	{
+		if (!file.is_open())
+			return;
+
+		Vec4 v = vec;
+		v.x *= -1.0f;
+		v.y *= -1.0f;
+
+		file.write((const char*)&vec, sizeof(Vec4));
+	}
+
+
 	/// Writes each Vec4 component of the Transform (order is T, R, S)
 	void appendTransform(std::ofstream& file, const DecomposedTransform transform)
 	{
@@ -107,9 +133,9 @@ namespace FBXExport
 			return;
 
 		/// Write each vector (T, R, S) (R is quaternion)
-		file.write((const char*)&transform.translation, sizeof(Vec4));
-		file.write((const char*)&transform.rotation, sizeof(Vec4));
-		file.write((const char*)&transform.scale, sizeof(Vec4));
+		appendFloat4AsDirectXVector(file, transform.translation);
+		appendFloat4AsDirectXQuaternion(file, transform.rotation);
+		appendFloat4(file, transform.scale);
 	}
 
 	void appendInt32(std::ofstream& file, const int32_t value)

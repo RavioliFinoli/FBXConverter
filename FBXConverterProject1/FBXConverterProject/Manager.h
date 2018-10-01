@@ -22,7 +22,7 @@ public:
 	Converter(const char* fileName);
 	~Converter();
 
-	void convertFileToCustomFormatStefan();
+	void convertFileToCustomFormat();
 private:
 	FbxManager * sdk_Manager;
 	FbxIOSettings* sdk_IOSettings;

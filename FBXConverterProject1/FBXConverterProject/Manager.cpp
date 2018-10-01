@@ -46,7 +46,7 @@ Converter::~Converter()
 	sdk_Manager->Destroy();
 }
 
-void Converter::convertFileToCustomFormatStefan()
+void Converter::convertFileToCustomFormat()
 {
 	getSceneMeshes(scene_rootNode);
 
