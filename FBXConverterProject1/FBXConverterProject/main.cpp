@@ -11,7 +11,7 @@ int main()
 	Converter converter("test.fbx");
 	converter.convertFileToCustomFormatStefan();
 
-		SetConsoleTextAttribute(hConsole, 2);
+	SetConsoleTextAttribute(hConsole, 2);
 	std::cout << "Export finished."<< std::endl;
 
 

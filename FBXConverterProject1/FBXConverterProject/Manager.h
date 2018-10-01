@@ -32,13 +32,9 @@ private:
 	FbxScene* sdk_scene;
 	FbxNode* scene_rootNode;
 
-	/// ----------------
-	std::vector<FbxMatrix> getInverseBindPoseTransforms(FbxNode* skeletonRoot);
-	/// ----------------
-
 	bool createMeshFiles(int nrOfVertices, std::vector<FbxVector4>Positions, std::vector<FbxVector4>normals, std::vector<FbxVector2>UV, const char* node_name);
 	void getNames(FbxNode* scene_node);
-	void getSceneMeshes(FbxNode* scene_node, bool useStefan = false);
+	void getSceneMeshes(FbxNode* scene_node);
 	
 	bool createAnimatedMeshFile(FbxNode * scene_node, int nrOfVertices, std::vector<FbxVector4> Positions, std::vector<FbxVector4> normals, std::vector<FbxVector2> UV, const char * node_name, std::vector<int> weight_indices_vector);
 	bool createAnimatedMeshFileStefan(FbxNode * scene_node, int nrOfVertices, std::vector<FbxVector4> Positions, std::vector<FbxVector4> normals, std::vector<FbxVector2> UV, const char * node_name, std::vector<int> weight_indices_vector);

@@ -6,6 +6,7 @@
 
 namespace FBXExport
 {
+#pragma region ExportStructs
 	struct Vec4
 	{
 		float x, y, z, w;
@@ -89,7 +90,8 @@ namespace FBXExport
 			z = vec.mData[2];
 		}
 	};
-
+#pragma endregion ExportStructs
+#pragma region WriteFunctions
 	void appendFloat4(std::ofstream& file, const Vec4 vec)
 	{
 		if (!file.is_open())
@@ -145,84 +147,6 @@ namespace FBXExport
 			appendBone(file, bone);
 		}
 	}
-
-	///// Reads a Vec4 (four floats in x, y, z, w order)
-	//Vec4 loadVec4(std::ifstream& file)
-	//{
-	//	if (!file.is_open())
-	//		return FBXExport::Vec4();
-
-	//	Vec4 vec;
-	//	file.read((char*)&vec, sizeof(Vec4));
-
-	//	return vec;
-	//}
-
-	//int32_t loadInt32(std::ifstream& file)
-	//{
-	//	if (!file.is_open())
-	//		return 0;
-
-	//	int32_t int32;
-	//	file.read((char*)&int32, sizeof(int32_t));
-	//	return int32;
-	//}
-
-	//DecomposedTransform loadTransform(std::ifstream& file)
-	//{
-	//	if (!file.is_open())
-	//		return FBXExport::DecomposedTransform();
-
-	//	DecomposedTransform transform;
-
-	//	transform.translation = (loadVec4(file));
-	//	transform.rotation    = (loadVec4(file));
-	//	transform.scale       = (loadVec4(file));
-
-	//	return transform;
-	//}
-
-	//FBXExport::Bone loadBone(std::ifstream& file)
-	//{
-	//	if (!file.is_open())
-	//		return FBXExport::Bone();
-
-	//	FBXExport::Bone bone;
-	//	bone.jointInverseBindPoseTransform = loadTransform(file);
-	//	bone.jointReferenceTransform       = loadTransform(file);
-	//	bone.parentIndex                   = loadInt32(file);
-
-	//	return bone;
-	//}
-
-	//Skeleton loadSkeleton(std::ifstream& file, int32_t boneCount)
-	//{
-	//	if (!file.is_open())
-	//		return FBXExport::Skeleton();
-
-	//	/// Read and add each bone to vector
-	//	Skeleton skeleton;
-	//	for (int i = 0; i < boneCount; i++)
-	//		skeleton.joints.push_back(loadBone(file));
-	//	
-	//	return skeleton;
-	//}
-
-	//// If no boneCount is supplied, we assume we read that data first
-	//Skeleton loadSkeleton(std::ifstream& file)
-	//{
-	//	if (!file.is_open())
-	//		return FBXExport::Skeleton();
-
-	//	/// Read bone count
-	//	int32_t boneCount = loadInt32(file);
-
-	//	/// Read and add each bone to vector
-	//	Skeleton skeleton;
-	//	for (int i = 0; i < boneCount; i++)
-	//		skeleton.joints.push_back(loadBone(file));
-
-	//	return skeleton;
-	//}
+#pragma endregion WriteFunctions
 }
 
