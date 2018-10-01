@@ -15,6 +15,7 @@ struct AnimatedVertex
 	unsigned int influencing_joint[4];
 	float joint_weights[4];
 };
+
 struct Transform {
 	float transform_position[3];
 	float transform_rotation[3];

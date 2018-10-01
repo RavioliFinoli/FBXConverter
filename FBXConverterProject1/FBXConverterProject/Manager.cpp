@@ -134,28 +134,15 @@ void Converter::getSceneMeshes(FbxNode* scene_node)
 
 bool Converter::createAnimatedMeshFile(FbxNode * scene_node, int nrOfVertices, std::vector<FbxVector4> Positions, std::vector<FbxVector4> normals, std::vector<FbxVector2> UV, const char * node_name, std::vector<int> weight_indices_vector)
 {
-	std::vector<AnimatedVertex> skin_bound_vertices = std::vector<AnimatedVertex>(nrOfVertices);
-
+	//using FBXExport::Vec2;
+	//using FBXExport::Vec3;
+	//using FBXExport::Vec4;
+	//using FBXExport::Vec4ui;
+	//
+	std::vector<FBXExport::AnimatedVertexStefan> skin_bound_vertices = std::vector<FBXExport::AnimatedVertexStefan>(nrOfVertices);
 
 	for (int i = 0; i < nrOfVertices; i++)
-	{
-		COPY_DOUBLE_FLOAT(3, Positions[i], skin_bound_vertices[i].vertex_position);
-		COPY_DOUBLE_FLOAT(3, normals[i], skin_bound_vertices[i].vertex_normal);
-		COPY_DOUBLE_FLOAT(2, UV[i], skin_bound_vertices[i].vertex_UVCoord);
-
-
-		skin_bound_vertices[i].joint_weights[0] = 0.0f;
-		skin_bound_vertices[i].joint_weights[1] = 0.0f;
-		skin_bound_vertices[i].joint_weights[2] = 0.0f;
-		skin_bound_vertices[i].joint_weights[3] = 0.0f;
-
-		skin_bound_vertices[i].influencing_joint[0] = 0;
-		skin_bound_vertices[i].influencing_joint[1] = 0;
-		skin_bound_vertices[i].influencing_joint[2] = 0;
-		skin_bound_vertices[i].influencing_joint[3] = 0;
-
-
-	}
+		skin_bound_vertices[i] = FBXExport::AnimatedVertexStefan(FBXExport::Vec3(Positions[i]), FBXExport::Vec2(UV[i]), FBXExport::Vec3(normals[i]));
 
 	FbxMesh* scene_mesh = scene_node->GetMesh();
 	FBXExport::Skeleton eSkeleton;
@@ -249,10 +236,10 @@ bool Converter::createAnimatedMeshFile(FbxNode * scene_node, int nrOfVertices, s
 						{
 							for (int m = 0; m < 4; m++)
 							{
-								if (skin_bound_vertices[k].influencing_joint[m] == 0)
+								if (skin_bound_vertices[k].influencingJoints[m] == 0)
 								{
-									skin_bound_vertices[k].influencing_joint[m] = j + 1;
-									skin_bound_vertices[k].joint_weights[m] = weights[x];
+									skin_bound_vertices[k].influencingJoints[m] = j + 1;
+									skin_bound_vertices[k].jointWeights[m] = weights[x];
 									m = 4;
 								}
 							}
@@ -288,130 +275,94 @@ bool Converter::createAnimatedMeshFile(FbxNode * scene_node, int nrOfVertices, s
 		readable_file << "NrOfverts: " << nrOfVerts << "\n";
 		readable_file.write((const char*)node_name, sizeof(char[100]));
 		readable_file << "\n";
-		for (int i = 0; i < nrOfVerts; i++)
-		{
-		}
 		outfile.write((const char*)&nrOfVerts, sizeof(int));
 		outfile.write((const char*)node_name, sizeof(const char[100]));
 
-		float tan[3];
-		float dVec1[3];
-		float dVec2[3];
-		float vec1[3];
-		float vec2[3];
-		float uVec1[2];
-		float uVec2[2];
 		std::vector<float> tanVec;
-
-		for (int i = 0; i < nrOfVerts; i += 3)
+		// tangent stuff
 		{
+			float tan[3];
+			float dVec1[3];
+			float dVec2[3];
+			float vec1[3];
+			float vec2[3];
+			float uVec1[2];
+			float uVec2[2];
 
-			vec1[0] = Positions[i + 1][0] - Positions[i][0];
-			vec1[1] = Positions[i + 1][1] - Positions[i][1];
-			vec1[2] = Positions[i + 1][2] - Positions[i][2];
-
-			vec2[0] = Positions[i + 2][0] - Positions[i][0];
-			vec2[1] = Positions[i + 2][1] - Positions[i][1];
-			vec2[2] = Positions[i + 2][2] - Positions[i][2];
-
-
-
-			uVec1[0] = UV[i + 1][0] - UV[i][0];
-			uVec1[1] = UV[i + 1][1] - UV[i][1];
-
-			uVec2[0] = UV[i + 2][0] - UV[i][0];
-			uVec2[1] = UV[i + 2][1] - UV[i][1];
-
-			float denominator = (uVec1[0] * uVec2[1]) - (uVec1[1] * uVec2[0]);
-			float someFloat = 1.0f / denominator;
-
-
-
-			dVec1[0] = vec1[0] * uVec2[1];
-			dVec1[1] = vec1[1] * uVec2[1];
-			dVec1[2] = vec1[2] * uVec2[1];
-
-			dVec2[0] = vec2[0] * uVec1[1];
-			dVec2[1] = vec2[1] * uVec1[1];
-			dVec2[2] = vec2[2] * uVec1[1];
-
-
-			tan[0] = dVec1[0] - dVec2[0];
-			tan[1] = dVec1[1] - dVec2[1];
-			tan[2] = dVec1[2] - dVec2[2];
-
-			tan[0] = tan[0] * someFloat;
-			tan[1] = tan[1] * someFloat;
-			tan[2] = tan[2] * someFloat;
-
-			for (int j = 0; j < 3; j++)
+			for (int i = 0; i < nrOfVerts; i += 3)
 			{
-				for (int x = 0; x < 3; x++)
+
+				vec1[0] = Positions[i + 1][0] - Positions[i][0];
+				vec1[1] = Positions[i + 1][1] - Positions[i][1];
+				vec1[2] = Positions[i + 1][2] - Positions[i][2];
+
+				vec2[0] = Positions[i + 2][0] - Positions[i][0];
+				vec2[1] = Positions[i + 2][1] - Positions[i][1];
+				vec2[2] = Positions[i + 2][2] - Positions[i][2];
+
+
+
+				uVec1[0] = UV[i + 1][0] - UV[i][0];
+				uVec1[1] = UV[i + 1][1] - UV[i][1];
+
+				uVec2[0] = UV[i + 2][0] - UV[i][0];
+				uVec2[1] = UV[i + 2][1] - UV[i][1];
+
+				float denominator = (uVec1[0] * uVec2[1]) - (uVec1[1] * uVec2[0]);
+				float someFloat = 1.0f / denominator;
+
+
+
+				dVec1[0] = vec1[0] * uVec2[1];
+				dVec1[1] = vec1[1] * uVec2[1];
+				dVec1[2] = vec1[2] * uVec2[1];
+
+				dVec2[0] = vec2[0] * uVec1[1];
+				dVec2[1] = vec2[1] * uVec1[1];
+				dVec2[2] = vec2[2] * uVec1[1];
+
+
+				tan[0] = dVec1[0] - dVec2[0];
+				tan[1] = dVec1[1] - dVec2[1];
+				tan[2] = dVec1[2] - dVec2[2];
+
+				tan[0] = tan[0] * someFloat;
+				tan[1] = tan[1] * someFloat;
+				tan[2] = tan[2] * someFloat;
+
+				for (int j = 0; j < 3; j++)
 				{
-					tanVec.push_back(tan[x]);
+					for (int x = 0; x < 3; x++)
+					{
+						tanVec.push_back(tan[x]);
+					}
 				}
 			}
 		}
 
-
 		for (int i = 0; i < nrOfVerts; i++)
 		{
-			//TODO READ/WRITE FLOAT INSTEAD DOUBLES->PAIR WITH ENGINE
-			float temp[4];
-			unsigned int tempWeights[4];
-			for (int j = 0; j < 4; j++)
-			{
-				tempWeights[j] = skin_bound_vertices[i].influencing_joint[j];
-			}
-			COPY_DOUBLE_FLOAT(3, skin_bound_vertices[i].vertex_position, temp);
+			FBXExport::appendFloat3AsDirectXVector(outfile, skin_bound_vertices[i].position);
+			FBXExport::appendFloat2(outfile, skin_bound_vertices[i].UV);
+			FBXExport::appendFloat3AsDirectXVector(outfile, skin_bound_vertices[i].normal);
 
-			outfile.write((const char*)&skin_bound_vertices[i].vertex_position[0], sizeof(float));
-			outfile.write((const char*)&skin_bound_vertices[i].vertex_position[1], sizeof(float));
-			outfile.write((const char*)&skin_bound_vertices[i].vertex_position[2], sizeof(float));
-			readable_file << i << ":  Position:  X " << temp[0] << " Y " << temp[1] << " Z " << temp[2] << "\n";
-
-			COPY_DOUBLE_FLOAT(2, UV[i], temp);
-
-			outfile.write((const char*)&skin_bound_vertices[i].vertex_UVCoord[0], sizeof(float));
-			outfile.write((const char*)&skin_bound_vertices[i].vertex_UVCoord[1], sizeof(float));
-
-			readable_file << i << ":  UV:  U " << temp[0] << "V " << temp[1] << "\n";
-
-
-			COPY_DOUBLE_FLOAT(3, normals[i], temp);
-			outfile.write((const char*)&skin_bound_vertices[i].vertex_normal[0], sizeof(float));
-			outfile.write((const char*)&skin_bound_vertices[i].vertex_normal[1], sizeof(float));
-			outfile.write((const char*)&skin_bound_vertices[i].vertex_normal[2], sizeof(float));
-
-			readable_file << i << ":  Normals:  X " << skin_bound_vertices[i].vertex_normal[0] << " Y " << skin_bound_vertices[i].vertex_normal[1] << " Z " << skin_bound_vertices[i].vertex_normal[2] << "\n";
 			auto first = tanVec.begin();
 			auto last = tanVec.begin() + 3;
-
 			std::vector<float> x(first, last);
+			FBXExport::Vec3 tan = FBXExport::Vec3(x[0], x[1], x[2]);
 			tanVec.erase(first, last);
-			outfile.write((const char*)&x[0], sizeof(float));
-			outfile.write((const char*)&x[1], sizeof(float));
-			outfile.write((const char*)&x[2], sizeof(float));
+			
+			FBXExport::appendFloat3AsDirectXVector(outfile, tan);
+			FBXExport::appendUInt4(outfile, skin_bound_vertices[i].influencingJoints);
+			FBXExport::appendFloat4(outfile, skin_bound_vertices[i].jointWeights);
+
+			readable_file << i << ":  Position:  X " << skin_bound_vertices[i].position[0] << " Y " << skin_bound_vertices[i].position[1] << " Z " << skin_bound_vertices[i].position[2] << "\n";
+			readable_file << i << ":  UV:  U " << skin_bound_vertices[i].UV[0] << "V " << skin_bound_vertices[i].UV[1] << "\n";
+			readable_file << i << ":  Normals:  X " << skin_bound_vertices[i].normal[0] << " Y " << skin_bound_vertices[i].normal[1] << " Z " << skin_bound_vertices[i].normal[2] << "\n";
 			readable_file << i << ":  tan:  X " << x[0] << " Y " << x[1] << " Z " << x[2] << "\n";
-
-			outfile.write((const char*)&tempWeights[0], sizeof(unsigned int));
-			outfile.write((const char*)&tempWeights[1], sizeof(unsigned int));
-			outfile.write((const char*)&tempWeights[2], sizeof(unsigned int));
-			outfile.write((const char*)&tempWeights[3], sizeof(unsigned int));
-
-			COPY_DOUBLE_FLOAT(4, skin_bound_vertices[i].joint_weights, temp);
-			outfile.write((const char*)&temp[0], sizeof(float));
-			outfile.write((const char*)&temp[1], sizeof(float));
-			outfile.write((const char*)&temp[2], sizeof(float));
-			outfile.write((const char*)&temp[3], sizeof(float));
-
 			readable_file << i << ":  Weights:  1: " << temp[0] << " 2: " << temp[1] << " 3: " << temp[2] << " 4: " << temp[3] << "\n";
-
-			readable_file << i << ":  Influencing indices:  1: " << tempWeights[0] << " 2: " << tempWeights[1] << " 3: " << tempWeights[2] << " 4: " << tempWeights[3] << "\n";
-
+			readable_file << i << ":  Influencing indices:  1: " << skin_bound_vertices[i].influencingJoints[0] << " 2: " << skin_bound_vertices[i].influencingJoints[1] << " 3: " << skin_bound_vertices[i].influencingJoints[2] << " 4: " << skin_bound_vertices[i].influencingJoints[3] << "\n";
 		}
-
-
 
 		readable_file.close();
 		outfile.close();

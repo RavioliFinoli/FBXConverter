@@ -28,7 +28,31 @@ namespace FBXExport
 		Vec4(float _x, float _y, float _z, float _w)
 			: x(_x), y(_y), z(_z), w(_w)
 		{};
-		Vec4() {};
+		Vec4() : x(0.0f), y(0.0f), z(0.0f), w(0.0f)
+		{};
+
+		float& operator[](int i)
+		{
+			float* ptr = &x;
+			return *(ptr += i);
+		}
+	};
+
+	struct Vec4ui
+	{
+		unsigned int x, y, z, w;
+
+		Vec4ui(unsigned int _x, unsigned int _y, unsigned int _z, unsigned int _w)
+			: x(_x), y(_y), z(_z), w(_w)
+		{};
+		Vec4ui() : x(0), y(0), z(0), w(0)
+		{};
+
+		unsigned int& operator[](int i) 
+		{
+			unsigned int* ptr = &x;
+			return *(ptr += i);
+		}
 	};
 	
 	struct DecomposedTransform
@@ -89,6 +113,49 @@ namespace FBXExport
 			y = vec.mData[1];
 			z = vec.mData[2];
 		}
+		Vec3(float _x, float _y, float _z) : x(_x), y(_y), z(_z){};
+		Vec3() {};
+		float& operator[] (int i)
+		{
+			float* ptr = &x;
+			return *(ptr + i);
+		}
+	};
+
+	struct Vec2
+	{
+		float x, y;
+
+		Vec2(FbxVector2 vec2)
+		{
+			x = vec2.mData[0];
+			y = vec2.mData[1];
+		}
+		Vec2() : x(0.0), y(0.0) {};
+		float& operator[] (int i)
+		{
+			float* ptr = &x;
+			return *(ptr + i);
+		}
+	};
+
+	struct AnimatedVertexStefan
+	{
+		FBXExport::Vec3 position;
+		FBXExport::Vec2 UV;
+		FBXExport::Vec3 normal;
+		FBXExport::Vec4ui influencingJoints;
+		FBXExport::Vec4 jointWeights;
+
+		AnimatedVertexStefan(FBXExport::Vec3 pos, FBXExport::Vec2 uv, FBXExport::Vec3 nor)
+		{
+			position = pos;
+			UV = uv;
+			normal = nor;
+			influencingJoints = FBXExport::Vec4ui();
+			jointWeights = FBXExport::Vec4();
+		}
+		AnimatedVertexStefan() {};
 	};
 #pragma endregion ExportStructs
 #pragma region WriteFunctions
@@ -109,7 +176,7 @@ namespace FBXExport
 		Vec4 v = vec;
 		v.z *= -1.0f;
 
-		file.write((const char*)&vec, sizeof(Vec4));
+		file.write((const char*)&v, sizeof(Vec4));
 	}
 
 	//Flips X and Y components before writing
@@ -122,9 +189,42 @@ namespace FBXExport
 		v.x *= -1.0f;
 		v.y *= -1.0f;
 
-		file.write((const char*)&vec, sizeof(Vec4));
+		file.write((const char*)&v, sizeof(Vec4));
 	}
 
+	void appendFloat3(std::ofstream& file, const Vec3 vec)
+	{
+		if (!file.is_open())
+			return;
+
+		file.write((const char*)&vec, sizeof(Vec3));
+	}
+
+	void appendFloat3AsDirectXVector(std::ofstream& file, const Vec3 vec)
+	{
+		if (!file.is_open())
+			return;
+		Vec3 v = vec;
+		v.z *= -1.0f;
+
+		file.write((const char*)&v, sizeof(Vec3));
+	}
+
+	void appendFloat2(std::ofstream& file, const Vec2 vec)
+	{
+		if (!file.is_open())
+			return;
+
+		file.write((const char*)&vec, sizeof(Vec2));
+	}
+
+	void appendUInt4(std::ofstream& file, const Vec4ui vec)
+	{
+		if (!file.is_open())
+			return;
+
+		file.write((const char*)&vec, sizeof(Vec4ui));
+	}
 
 	/// Writes each Vec4 component of the Transform (order is T, R, S)
 	void appendTransform(std::ofstream& file, const DecomposedTransform transform)

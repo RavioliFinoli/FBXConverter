@@ -12,8 +12,8 @@
 
 namespace FBXExport
 {
-	class DecomposedTransform;
-	class Skeleton;
+	struct DecomposedTransform;
+	struct Skeleton;
 }
 
 class Converter
