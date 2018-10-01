@@ -134,11 +134,6 @@ void Converter::getSceneMeshes(FbxNode* scene_node)
 
 bool Converter::createAnimatedMeshFile(FbxNode * scene_node, int nrOfVertices, std::vector<FbxVector4> Positions, std::vector<FbxVector4> normals, std::vector<FbxVector2> UV, const char * node_name, std::vector<int> weight_indices_vector)
 {
-	//using FBXExport::Vec2;
-	//using FBXExport::Vec3;
-	//using FBXExport::Vec4;
-	//using FBXExport::Vec4ui;
-	//
 	std::vector<FBXExport::AnimatedVertexStefan> skin_bound_vertices = std::vector<FBXExport::AnimatedVertexStefan>(nrOfVertices);
 
 	for (int i = 0; i < nrOfVertices; i++)
