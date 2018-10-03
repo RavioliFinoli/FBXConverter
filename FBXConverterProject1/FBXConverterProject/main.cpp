@@ -8,7 +8,7 @@ int main()
 #endif
 	HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 
-	Converter converter("test.fbx");
+	Converter converter("ball.fbx");
 	converter.convertFileToCustomFormat();
 
 	SetConsoleTextAttribute(hConsole, 2);
