@@ -30,6 +30,9 @@ private:
 	FbxScene* sdk_scene;
 	FbxNode* scene_rootNode;
 
+	std::string modelActualName = "";
+	std::string finalExportDirectory = "";
+
 	void getSceneMeshes(FbxNode* scene_node);
 	bool getSceneAnimationData(FbxNode* scene_node, std::vector<std::vector<FBXExport::DecomposedTransform>> &transform_vector);
 	bool createMeshFiles(int nrOfVertices, std::vector<FbxVector4>Positions, std::vector<FbxVector4>normals, std::vector<FbxVector2>UV, const char* node_name);

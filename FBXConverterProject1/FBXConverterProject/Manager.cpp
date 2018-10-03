@@ -3,6 +3,8 @@
 #include <windows.h>
 #include <DirectXMath.h>
 #include "ExportHelpers.h"
+#include <cctype>
+#include <algorithm>
 #define ZERO_IF_SMALL(x) if(std::fabs(x<0.0001))x=0.0f
 #define EXPORT_LOCATION "C:/Repos/RipTag/Assets/"
 #define COLOR_ATTRIBUTE_GREEN 2
@@ -19,11 +21,32 @@ HANDLE hConsole;
 
 void ProcessSkeletonHierarchy(FbxNode* inRootNode, FBXExport::Skeleton& skeleton);
 
+std::string str_toupper(std::string s) {
+	std::transform(s.begin(), s.end(), s.begin(), 
+		[](unsigned char c) { return std::toupper(c); });
+	return s;
+}
+
 Converter::Converter(const char* fileName)
 {
 	hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 	SetConsoleTextAttribute(hConsole, COLOR_ATTRIBUTE_GREEN);
 	std::cout << "Converting " << fileName << "..." << std::endl << std::endl;
+
+	//Get actual name
+	{
+		std::string s = fileName;
+		auto sIter = s.rbegin();
+		s.erase(s.end() - 4, s.end());
+		modelActualName = s;
+		
+	}
+	//Create directory if it doesn't exist
+	{
+		std::string dir = std::string(EXPORT_LOCATION) + str_toupper(modelActualName) + std::string("FOLDER");
+		finalExportDirectory = dir + std::string("/");
+		CreateDirectory(dir.c_str(), NULL);
+	}
 
 	sdk_Manager = FbxManager::Create();
 	sdk_IOSettings = FbxIOSettings::Create(sdk_Manager, IOSROOT);
@@ -248,9 +271,9 @@ bool Converter::createAnimatedMeshFile(FbxNode * scene_node, int nrOfVertices, s
 		int nrOfVerts = nrOfVertices;
 		const char * temp = "_Mesh";
 		// #todo proper file name
-		std::string filename = std::string(EXPORT_LOCATION) + /*std::string(node_name) + */"test_ANIMATION_Mesh.bin";
+		std::string filename = finalExportDirectory + std::string(str_toupper(modelActualName)) + "_ANIMESH.bin";
 		std::ofstream outfile(filename, std::ofstream::binary);
-		std::string readable_file_name = std::string(EXPORT_LOCATION) + /*std::string(node_name) +*/ "test_ANIMATION_Mesh.txt";
+		std::string readable_file_name = finalExportDirectory + std::string(modelActualName) + "_animesh.txt";
 		std::ofstream readable_file(readable_file_name);
 
 		std::cout << "Found mesh:  " << node_name << " Nr of verts: " << nrOfVerts << "\n";
@@ -373,9 +396,9 @@ bool Converter::createMeshFiles(int nrOfVertices, std::vector<FbxVector4>Positio
 
 	int nrOfVerts = nrOfVertices;
 	const char * temp = "_Mesh";
-	std::string filename = std::string(EXPORT_LOCATION) + /*std::string(node_name) +*/ "test_Mesh.bin";
+	std::string filename = finalExportDirectory + std::string(str_toupper(modelActualName)) + "_MESH.bin";
 	std::ofstream outfile(filename, std::ofstream::binary);
-	std::string readable_file_name = std::string(EXPORT_LOCATION) + /*std::string(node_name) +*/ "test_Mesh.txt";
+	std::string readable_file_name = finalExportDirectory + std::string(modelActualName) + "_mesh.txt";
 	std::ofstream readable_file(readable_file_name);
 
 	std::cout << "Found mesh:  " << node_name << " Nr of verts: " << nrOfVerts << "\n";
@@ -588,9 +611,9 @@ bool Converter::getSceneAnimationData(FbxNode * scene_node, std::vector<std::vec
 bool Converter::createSkeletonFile(const FBXExport::Skeleton& skeleton)
 {
 	std::string rootJointName = std::string(skeleton.joints[0].name.Buffer());
-	std::string filename = std::string(EXPORT_LOCATION) + rootJointName + std::string("_Skeleton.bin");
+	std::string filename = finalExportDirectory + std::string(str_toupper(modelActualName)) + "_SKELETON.bin";
 	std::ofstream outfile(filename, std::ofstream::binary);
-	std::string readable_file_name = std::string(EXPORT_LOCATION) + rootJointName + std::string("_Skeleton.txt");
+	std::string readable_file_name = finalExportDirectory + std::string(modelActualName) + "_skeleton.txt";
 	std::ofstream readable_file(readable_file_name);
 
 	FBXExport::appendSkeleton(outfile, skeleton);
@@ -603,9 +626,9 @@ bool Converter::createSkeletonFile(const FBXExport::Skeleton& skeleton)
 
 void Converter::createAnimationFile(std::vector<std::vector<FBXExport::DecomposedTransform>> keys)
 {
-	std::string filename = std::string(EXPORT_LOCATION) + std::string("ANIMATION") + "_ANIMATION.bin";
+	std::string filename = finalExportDirectory + std::string(str_toupper(modelActualName)) + "_ANIMATION.bin";
 	std::ofstream outfile(filename, std::ofstream::binary);
-	std::string readable_file_name = std::string(EXPORT_LOCATION) + std::string("ANIMATION") + "_ANIMATION.txt";
+	std::string readable_file_name = finalExportDirectory + std::string(modelActualName) + "_animation.txt";
 	std::ofstream readable_file(readable_file_name);
 
 	int32_t nrOfKeys = keys[0].size();
