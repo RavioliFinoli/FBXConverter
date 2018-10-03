@@ -536,8 +536,9 @@ bool Converter::getSceneAnimationData(FbxNode * scene_node, std::vector<std::vec
 		FbxSkeleton* skeleton = static_cast<FbxSkeleton*>(scene_node->GetNodeAttribute());
 		if (skeleton)
 		{
-			float frameTime = 1.0 / 24.0;
-			int keyCount = anim_curve_rotY->KeyGetCount();
+			float frameTime = 1.0 / 24.0; // #todo actual framerate?
+
+			int keyCount = anim_curve_rotY->KeyGetCount() + 1;
 
 			float endTime = frameTime * keyCount;
 			float currentTime = frameTime;
