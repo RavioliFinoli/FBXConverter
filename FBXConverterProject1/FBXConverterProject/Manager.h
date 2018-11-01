@@ -16,12 +16,20 @@ namespace FBXExport
 	struct Skeleton;
 }
 
+enum EXPORT_FLAGS
+{
+	MESH = 0,
+	SKELETON = 1 << 0,
+	ANIMATION = 1 << 1
+};
+
 class Converter
 {
 public:
 	Converter(const char* fileName);
 	~Converter();
 
+	void convertFileToCustomFormat(EXPORT_FLAGS flags);
 	void convertFileToCustomFormat();
 private:
 	FbxManager * sdk_Manager;
