@@ -8,7 +8,7 @@ int main(int argc, char **argv)
 #endif
 
 	HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-	std::string file = "t.fbx";
+	std::string file = "Guard_Walk.fbx";
 	//argc > 1
 	//	? file = std::string(argv[1])
 	//	: file = " ";

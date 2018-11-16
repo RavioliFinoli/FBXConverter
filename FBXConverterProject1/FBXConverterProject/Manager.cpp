@@ -294,9 +294,9 @@ bool Converter::createAnimatedMeshFile(FbxNode * scene_node, int nrOfVertices, s
 		int nrOfVerts = nrOfVertices;
 		const char * temp = "_Mesh";
 		// #todo proper file name
-		std::string filename = finalExportDirectory + std::string(str_toupper(modelActualName)) + "_ANIMESH.bin";
+		std::string filename = finalExportDirectory + std::string(str_toupper(modelActualName)) + "_ANIMATED.bin";
 		std::ofstream outfile(filename, std::ofstream::binary);
-		std::string readable_file_name = finalExportDirectory + std::string(modelActualName) + "_animesh.txt";
+		std::string readable_file_name = finalExportDirectory + std::string(modelActualName) + "_animated.txt";
 		std::ofstream readable_file(readable_file_name);
 
 		std::cout << "Found mesh:  " << node_name << " Nr of verts: " << nrOfVerts << "\n";
@@ -589,6 +589,7 @@ bool Converter::getSceneAnimationData(FbxNode * scene_node, std::vector<std::vec
 		if (skeleton && type == FbxNodeAttribute::eSkeleton)
 		{
 			std::cout << "PROCESSING ANIMATION ON " << scene_node->GetNameOnly() << std::endl;
+			std::cout << "\tParent: " << scene_node->GetParent()->GetNameOnly() << std::endl;
 			float frameTime = 1.0 / 24.0; // #todo actual framerate?
 
 			int keyCount = anim_curve_rotY->KeyGetCount() + 1;
