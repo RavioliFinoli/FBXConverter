@@ -6,7 +6,7 @@
 #include <cctype>
 #include <algorithm>
 #define ZERO_IF_SMALL(x) if(std::fabs(x<0.0001))x=0.0f
-#define EXPORT_LOCATION "C:/Repos/RipTag/Assets/"
+#define EXPORT_LOCATION "C:/Repos/Poop/Assets/"
 #define COLOR_ATTRIBUTE_GREEN 2
 #define COLOR_ATTRIBUTE_RED 4
 #define COLOR_ATTRIBUTE_BLUE 9
@@ -36,10 +36,13 @@ Converter::Converter(const char* fileName)
 	//Get actual name
 	{
 		std::string s = fileName;
+		auto pos = s.find_last_of("/");
+		if (pos != std::string::npos)
+			s.erase(s.begin(), s.begin() + pos + 1);
 		auto sIter = s.rbegin();
 		s.erase(s.end() - 4, s.end());
 		modelActualName = s;
-		
+		std::cout << modelActualName << std::endl;
 	}
 	//Create directory if it doesn't exist
 	{
@@ -69,9 +72,29 @@ Converter::~Converter()
 	sdk_Manager->Destroy();
 }
 
+void Converter::convertFileToCustomFormat(EXPORT_FLAGS flags)
+{
+	if (flags & MESH)
+		getSceneMeshes(scene_rootNode);
+
+	
+	std::vector<std::vector<FBXExport::DecomposedTransform>> animation_key_vectors;
+	
+	if (flags & ANIMATION || flags & SKELETON)
+	getSceneAnimationData(scene_rootNode, animation_key_vectors) ? printf("GetSceneANimationData run\n") : printf("GetSceneANimationData failed in main\n ");
+	if (animation_key_vectors.size() > 0)
+		createAnimationFile(animation_key_vectors);
+}
+
 void Converter::convertFileToCustomFormat()
 {
-	getSceneMeshes(scene_rootNode);
+	std::cout << "\nProcess mesh?\n\n";
+	std::string doMeshAnswer = "";
+	std::cin >> doMeshAnswer;
+	if (doMeshAnswer == "yes" 
+		|| doMeshAnswer == "1"
+		|| doMeshAnswer == "y")
+		getSceneMeshes(scene_rootNode);
 
 	std::vector<std::vector<FBXExport::DecomposedTransform>> animation_key_vectors;
 
@@ -271,9 +294,9 @@ bool Converter::createAnimatedMeshFile(FbxNode * scene_node, int nrOfVertices, s
 		int nrOfVerts = nrOfVertices;
 		const char * temp = "_Mesh";
 		// #todo proper file name
-		std::string filename = finalExportDirectory + std::string(str_toupper(modelActualName)) + "_ANIMESH.bin";
+		std::string filename = finalExportDirectory + std::string(str_toupper(modelActualName)) + "_ANIMATED.bin";
 		std::ofstream outfile(filename, std::ofstream::binary);
-		std::string readable_file_name = finalExportDirectory + std::string(modelActualName) + "_animesh.txt";
+		std::string readable_file_name = finalExportDirectory + std::string(modelActualName) + "_animated.txt";
 		std::ofstream readable_file(readable_file_name);
 
 		std::cout << "Found mesh:  " << node_name << " Nr of verts: " << nrOfVerts << "\n";
@@ -556,9 +579,17 @@ bool Converter::getSceneAnimationData(FbxNode * scene_node, std::vector<std::vec
 
 	if (anim_curve_rotY)
 	{
+		auto type = scene_node->GetNodeAttribute()->GetAttributeType();
+
+		//if (type != FbxNodeAttribute::eSkeleton)
+		//	return true;
+
+
 		FbxSkeleton* skeleton = static_cast<FbxSkeleton*>(scene_node->GetNodeAttribute());
-		if (skeleton)
+		if (skeleton && type == FbxNodeAttribute::eSkeleton)
 		{
+			std::cout << "PROCESSING ANIMATION ON " << scene_node->GetNameOnly() << std::endl;
+			std::cout << "\tParent: " << scene_node->GetParent()->GetNameOnly() << std::endl;
 			float frameTime = 1.0 / 24.0; // #todo actual framerate?
 
 			int keyCount = anim_curve_rotY->KeyGetCount() + 1;
@@ -574,8 +605,8 @@ bool Converter::getSceneAnimationData(FbxNode * scene_node, std::vector<std::vec
 				takeTime.SetSecondDouble(currentTime);
 
 				// #calculateLocalTransform
-				FbxAMatrix matAbsoluteTransform2 = GetAbsoluteTransformFromCurrentTake(skeleton->GetNode(), takeTime);
-				FbxAMatrix matParentAbsoluteTransform2 = GetAbsoluteTransformFromCurrentTake(skeleton->GetNode()->GetParent(), takeTime);
+				FbxAMatrix matAbsoluteTransform2 = GetAbsoluteTransformFromCurrentTake(scene_node, takeTime);
+				FbxAMatrix matParentAbsoluteTransform2 = GetAbsoluteTransformFromCurrentTake(scene_node->GetParent(), takeTime);
 				FbxAMatrix matInvParentAbsoluteTransform2 = matParentAbsoluteTransform2.Inverse();
 				FbxAMatrix matTransform2 = matInvParentAbsoluteTransform2 * matAbsoluteTransform2;
 
@@ -655,7 +686,7 @@ void ProcessSkeletonHierarchyRecursively(FbxNode* inNode, FBXExport::Skeleton& s
 	{
 		FBXExport::Bone currJoint;;
 		currJoint.name = inNode->GetNameOnly();
-
+		currJoint.parentIndex = -2;
 		//find and set parent index
 		for (int i = 0; i < skeleton.joints.size(); i++) 
 		{
@@ -663,7 +694,37 @@ void ProcessSkeletonHierarchyRecursively(FbxNode* inNode, FBXExport::Skeleton& s
 			if (skeleton.joints[i].name == parentName)
 				currJoint.parentIndex = i;
 		}
-		
+		assert(currJoint.parentIndex >= 0);
+
+		if (currJoint.parentIndex == -2)
+		{
+			//Could not locate parent; go through grandparents until we find a joint match.
+			bool found = false;
+			auto currentParent = inNode;
+			do 
+			{
+				static int iterations = 0;
+				currentParent = currentParent->GetParent();
+				auto name = currentParent->GetNameOnly();
+
+				auto it = std::find_if(std::begin(skeleton.joints), std::end(skeleton.joints),
+					[&](const auto& joint) { return joint.name == name; });
+
+				iterations++;
+
+				if (it != std::end(skeleton.joints))
+				{
+					//Found joint
+					found = true;
+					iterations = 0;
+
+					currJoint.parentIndex = std::distance(skeleton.joints.begin(), it);
+				}
+				assert(iterations < 50);
+			} while (!found);
+		}
+
+		assert(currJoint.parentIndex >= 0);
 		skeleton.joints.push_back(currJoint);
 	}
 	for (int i = 0; i < childCount; i++)
