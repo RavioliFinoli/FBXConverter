@@ -269,18 +269,18 @@ bool Converter::createAnimatedMeshFile(FbxNode * scene_node, int nrOfVertices, s
 				double * weights = skin_cluster->GetControlPointWeights();
 				int *indices = skin_cluster->GetControlPointIndices();
 
-				for (int k = 0; k < skin_bound_vertices.size(); k++)
+				for (int vertex = 0; vertex < skin_bound_vertices.size(); vertex++)
 				{
-					for (int x = 0; x < skin_cluster->GetControlPointIndicesCount(); x++)
+					for (int cpIndex = 0; cpIndex < skin_cluster->GetControlPointIndicesCount(); cpIndex++)
 					{
-						if (indices[x] == weight_indices_vector[k])
+						if (indices[cpIndex] == weight_indices_vector[vertex])
 						{
 							for (int m = 0; m < 4; m++)
 							{
-								if (skin_bound_vertices[k].influencingJoints[m] == 0)
+								if (skin_bound_vertices[vertex].influencingJoints[m] == 0)
 								{
-									skin_bound_vertices[k].influencingJoints[m] = j + 1;
-									skin_bound_vertices[k].jointWeights[m] = weights[x];
+									skin_bound_vertices[vertex].influencingJoints[m] = j + 1;
+									skin_bound_vertices[vertex].jointWeights[m] = weights[cpIndex];
 									m = 4;
 								}
 							}
