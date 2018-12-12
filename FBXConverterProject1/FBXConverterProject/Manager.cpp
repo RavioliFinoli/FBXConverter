@@ -5,8 +5,10 @@
 #include "ExportHelpers.h"
 #include <cctype>
 #include <algorithm>
+
+std::string exportLocation = "C:/Assets/";
 #define ZERO_IF_SMALL(x) if(std::fabs(x<0.0001))x=0.0f
-#define EXPORT_LOCATION "C:/Repos/Poop/Assets/"
+#define EXPORT_LOCATION exportLocation
 #define COLOR_ATTRIBUTE_GREEN 2
 #define COLOR_ATTRIBUTE_RED 4
 #define COLOR_ATTRIBUTE_BLUE 9
@@ -29,26 +31,43 @@ std::string str_toupper(std::string s) {
 
 Converter::Converter(const char* fileName)
 {
+
 	hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 	SetConsoleTextAttribute(hConsole, COLOR_ATTRIBUTE_GREEN);
-	std::cout << "Converting " << fileName << "..." << std::endl << std::endl;
 
+	bool useOriginalFileLocation = false;
 	//Get actual name
 	{
 		std::string s = fileName;
-		auto pos = s.find_last_of("/");
+		auto pos = s.find_last_of('\\');
+
 		if (pos != std::string::npos)
-			s.erase(s.begin(), s.begin() + pos + 1);
+		{
+			useOriginalFileLocation = true;
+			std::cout << "found\n";
+			exportLocation = s;
+			exportLocation.erase(exportLocation.begin() + pos + 1, exportLocation.end());
+			s.erase(s.begin(), s.begin() + pos + 1);			
+		}
 		auto sIter = s.rbegin();
 		s.erase(s.end() - 4, s.end());
 		modelActualName = s;
-		std::cout << modelActualName << std::endl;
+		std::cout << "Converting " << modelActualName << std::endl << std::endl;
+
 	}
+
 	//Create directory if it doesn't exist
 	{
-		std::string dir = std::string(EXPORT_LOCATION) + str_toupper(modelActualName) + std::string("FOLDER");
-		finalExportDirectory = dir + std::string("/");
-		CreateDirectory(dir.c_str(), NULL);
+		if (!useOriginalFileLocation)
+		{
+			std::string dir = std::string(EXPORT_LOCATION) + str_toupper(modelActualName) + std::string("FOLDER");
+			finalExportDirectory = dir + std::string("/");
+			CreateDirectory(dir.c_str(), NULL);
+		}
+		else
+		{
+			finalExportDirectory = EXPORT_LOCATION;
+		}
 	}
 
 	sdk_Manager = FbxManager::Create();
@@ -296,8 +315,6 @@ bool Converter::createAnimatedMeshFile(FbxNode * scene_node, int nrOfVertices, s
 		// #todo proper file name
 		std::string filename = finalExportDirectory + std::string(str_toupper(modelActualName)) + "_ANIMATED.bin";
 		std::ofstream outfile(filename, std::ofstream::binary);
-		std::string readable_file_name = finalExportDirectory + std::string(modelActualName) + "_animated.txt";
-		std::ofstream readable_file(readable_file_name);
 
 		std::cout << "Found mesh:  " << node_name << " Nr of verts: " << nrOfVerts << "\n";
 
@@ -306,16 +323,7 @@ bool Converter::createAnimatedMeshFile(FbxNode * scene_node, int nrOfVertices, s
 			printf("No file could be opened. Manager.cpp line 122");
 			return false;
 		}
-		if (!readable_file)
-		{
-			printf("No file could be opened. Manager.cpp line 122");
-			return false;
-		}
 
-
-		readable_file << "NrOfverts: " << nrOfVerts << "\n";
-		readable_file.write((const char*)node_name, sizeof(char[100]));
-		readable_file << "\n";
 		outfile.write((const char*)&nrOfVerts, sizeof(int));
 		outfile.write((const char*)node_name, sizeof(const char[100]));
 
@@ -396,16 +404,7 @@ bool Converter::createAnimatedMeshFile(FbxNode * scene_node, int nrOfVertices, s
 			FBXExport::appendFloat3AsDirectXVector(outfile, tan);
 			FBXExport::appendUInt4(outfile, skin_bound_vertices[i].influencingJoints);
 			FBXExport::appendFloat4(outfile, skin_bound_vertices[i].jointWeights);
-
-			readable_file << i << ":  Position:  X " << skin_bound_vertices[i].position[0] << " Y " << skin_bound_vertices[i].position[1] << " Z " << skin_bound_vertices[i].position[2] << "\n";
-			readable_file << i << ":  UV:  U " << skin_bound_vertices[i].UV[0] << "V " << skin_bound_vertices[i].UV[1] << "\n";
-			readable_file << i << ":  Normals:  X " << skin_bound_vertices[i].normal[0] << " Y " << skin_bound_vertices[i].normal[1] << " Z " << skin_bound_vertices[i].normal[2] << "\n";
-			readable_file << i << ":  tan:  X " << x[0] << " Y " << x[1] << " Z " << x[2] << "\n";
-			readable_file << i << ":  Weights:  1: " << temp[0] << " 2: " << temp[1] << " 3: " << temp[2] << " 4: " << temp[3] << "\n";
-			readable_file << i << ":  Influencing indices:  1: " << skin_bound_vertices[i].influencingJoints[0] << " 2: " << skin_bound_vertices[i].influencingJoints[1] << " 3: " << skin_bound_vertices[i].influencingJoints[2] << " 4: " << skin_bound_vertices[i].influencingJoints[3] << "\n";
 		}
-
-		readable_file.close();
 		outfile.close();
 	}
 
@@ -421,8 +420,6 @@ bool Converter::createMeshFiles(int nrOfVertices, std::vector<FbxVector4>Positio
 	const char * temp = "_Mesh";
 	std::string filename = finalExportDirectory + std::string(str_toupper(modelActualName)) + "_MESH.bin";
 	std::ofstream outfile(filename, std::ofstream::binary);
-	std::string readable_file_name = finalExportDirectory + std::string(modelActualName) + "_mesh.txt";
-	std::ofstream readable_file(readable_file_name);
 
 	std::cout << "Found mesh:  " << node_name << " Nr of verts: " << nrOfVerts << "\n";
 
@@ -430,15 +427,6 @@ bool Converter::createMeshFiles(int nrOfVertices, std::vector<FbxVector4>Positio
 	{
 		return false;
 	}
-	if (!readable_file)
-	{
-		return false;
-	}
-
-	readable_file << "NrOfverts: " << nrOfVerts << "\n";
-
-	readable_file.write((const char*)node_name, sizeof(char[100]));
-	readable_file << "\n";
 	outfile.write((const char*)&nrOfVerts, sizeof(int));
 	outfile.write((const char*)node_name, sizeof(const char[100]));
 
@@ -513,21 +501,16 @@ bool Converter::createMeshFiles(int nrOfVertices, std::vector<FbxVector4>Positio
 		outfile.write((const char*)&temp[0], sizeof(float));
 		outfile.write((const char*)&temp[1], sizeof(float));
 		outfile.write((const char*)&temp[2], sizeof(float));
-		readable_file << i << ":  Position:  X " << temp[0] << " Y " << temp[1] << " Z " << temp[2] << "\n";
 
 		COPY_DOUBLE_FLOAT(2, UV[i], temp);
 
 		outfile.write((const char*)&temp[0], sizeof(float));
 		outfile.write((const char*)&temp[1], sizeof(float));
 
-		readable_file << i << ":  UV:  U " << temp[0] << "V " << temp[1] << "\n";
-
-
 		COPY_DOUBLE_FLOAT(3, normals[i], temp);
 		outfile.write((const char*)&temp[0], sizeof(float));
 		outfile.write((const char*)&temp[1], sizeof(float));
 		outfile.write((const char*)&temp[2], sizeof(float));
-		readable_file << i << ":  Normals:  X " << temp[0] << " Y " << temp[1] << " Z " << temp[2] << "\n";
 
 
 		auto first = tanVec.begin();
@@ -538,14 +521,7 @@ bool Converter::createMeshFiles(int nrOfVertices, std::vector<FbxVector4>Positio
 		outfile.write((const char*)&x[0], sizeof(float));
 		outfile.write((const char*)&x[1], sizeof(float));
 		outfile.write((const char*)&x[2], sizeof(float));
-		readable_file << i << ":  tan:  X " << x[0] << " Y " << x[1] << " Z " << x[2] << "\n";
-
 	}
-
-
-
-
-	readable_file.close();
 	outfile.close();
 
 	return true;
@@ -659,12 +635,9 @@ void Converter::createAnimationFile(std::vector<std::vector<FBXExport::Decompose
 {
 	std::string filename = finalExportDirectory + std::string(str_toupper(modelActualName)) + "_ANIMATION.bin";
 	std::ofstream outfile(filename, std::ofstream::binary);
-	std::string readable_file_name = finalExportDirectory + std::string(modelActualName) + "_animation.txt";
-	std::ofstream readable_file(readable_file_name);
 
 	int32_t nrOfKeys = keys[0].size();
 	outfile.write((const char*)&nrOfKeys, sizeof(int32_t));
-	readable_file << nrOfKeys << "\n";
 
 	for (int i = 0; i < keys[0].size(); i++)
 	{
@@ -676,7 +649,6 @@ void Converter::createAnimationFile(std::vector<std::vector<FBXExport::Decompose
 	}
 
 	outfile.close();
-	readable_file.close();
 }
 
 void ProcessSkeletonHierarchyRecursively(FbxNode* inNode, FBXExport::Skeleton& skeleton)

@@ -268,9 +268,13 @@ namespace FBXExport
 		file.write((char*)&jointCount, sizeof(jointCount));
 
 		/// Write each joint
-		for (const auto& bone : skeleton.joints)
+		for (size_t i = 0; i < skeleton.joints.size(); i++)
 		{
-			appendBone(file, bone);
+			//if (skeleton.joints[i].parentIndex > i)
+			//{
+			//	int ji = 0;
+			//}
+			appendBone(file, skeleton.joints[i]);
 		}
 	}
 #pragma endregion WriteFunctions
